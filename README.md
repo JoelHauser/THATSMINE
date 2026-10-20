@@ -12,13 +12,42 @@ can loot the body again.
 
 Works with vanilla bot looting and with ORBIT's looting. SAIN doesn't loot bodies itself.
 
+## Fika
+
+Works in Fika co-op: every player's open body is protected from the bots, whether that player is
+the host or not. Other players can still loot it.
+
+### Own kills only (host's choice)
+
+In F12, under **THATSMINE Fika → 1. Co-op**, the host can turn on **Players can only loot their own
+kills**. Then nobody (the host included) can take items off a body another player killed: you can
+open it and look, but nothing moves, and you get a "Not your kill" message naming the killer. The
+body opens up to everyone once its killer dies or extracts. The host can switch it during a raid;
+everyone else's setting is ignored. With a headless host, set it in the headless client's
+`BepInEx/config/com.mybutthasarash.thatsmine.fika.cfg`.
+
+A friend who disconnects without dying or extracting still counts as in the raid, so their kills
+stay locked until the raid ends.
+
+### Requirements
+
+**Everyone in the raid needs THATSMINE, the host most of all.** If a player who has it opens a body
+in a raid whose host doesn't, the host's game drops that moment's network updates. If you run a
+Fika server, add `com.mybutthasarash.thatsmine` and `com.mybutthasarash.thatsmine.fika` to Fika's
+required mods so nobody can join without them. With a headless host, install it on the headless
+client too.
+
 ## Install
 
-Unzip into your SPT folder. That puts `ThatsMine.dll` in `BepInEx/plugins`.
+Unzip into your SPT folder. That puts `ThatsMine.dll` and `ThatsMine.Fika.dll` in
+`BepInEx/plugins`. Without Fika, BepInEx skips `ThatsMine.Fika.dll` and logs that it is missing
+Fika; that is expected.
 
 ## Build
 
 ```powershell
-scripts\pack.ps1 -SPTPath H:\SPT4.1.X            # build + zip into dist\
-scripts\pack.ps1 -SPTPath H:\SPT4.1.X -Install   # also copy into the install
+scripts\pack.ps1 -SPTPath H:\SPT4.1.X -FikaCorePath <Fika.Core.dll>            # build + zip into dist\
+scripts\pack.ps1 -SPTPath H:\SPT4.1.X -FikaCorePath <Fika.Core.dll> -Install   # also copy into the install
 ```
+
+`-FikaCorePath` can be left out when Fika is installed in that SPT folder.

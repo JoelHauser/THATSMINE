@@ -6,22 +6,27 @@
     Run this through PowerShell, not Bash: Bash mangles 'H:\SPT4.1.X' into 'H:SPT4.1.X'.
 
     The zip is unpacked over the SPT root, so it carries the full path BepInEx/plugins/... .
-    It holds the plugin DLL and nothing else: no README or other docs.
+    It holds the two plugin DLLs and nothing else: no README or other docs.
     Entries are written by hand with forward slashes: PowerShell 5.1's Compress-Archive writes
     backslashes, which some extractors turn into file names instead of folders.
 
 .PARAMETER SPTPath
     The SPT install root to compile against (and install into, with -Install).
 
+.PARAMETER FikaCorePath
+    Fika.Core.dll to compile ThatsMine.Fika against. Defaults to the install's
+    BepInEx\plugins\Fika\Fika.Core.dll; pass one from a Fika release zip when Fika is not installed.
+
 .PARAMETER Install
-    Also copy the built plugin into the install's BepInEx\plugins.
+    Also copy the built plugins into the install's BepInEx\plugins.
 
 .EXAMPLE
     scripts\pack.ps1 -SPTPath H:\SPT4.1.X
-    scripts\pack.ps1 -SPTPath H:\SPT4.1.X -Install
+    scripts\pack.ps1 -SPTPath H:\SPT4.1.X -FikaCorePath C:\somewhere\Fika.Core.dll -Install
 #>
 param(
     [Parameter(Mandatory = $true)][string] $SPTPath,
+    [string] $FikaCorePath,
     [switch] $Install
 )
 
@@ -31,7 +36,12 @@ Add-Type -AssemblyName System.IO.Compression.FileSystem
 
 $root = Split-Path -Parent $PSScriptRoot
 $project = Join-Path $root 'src\ThatsMine\ThatsMine.csproj'
+$fikaProject = Join-Path $root 'src\ThatsMine.Fika\ThatsMine.Fika.csproj'
 $source = Join-Path $root 'src\ThatsMine\ThatsMinePlugin.cs'
+if (-not $FikaCorePath) { $FikaCorePath = Join-Path $SPTPath 'BepInEx\plugins\Fika\Fika.Core.dll' }
+if (-not (Test-Path $FikaCorePath)) {
+    throw "Fika.Core.dll not found at '$FikaCorePath'. Pass -FikaCorePath with one from a Fika release zip."
+}
 
 if (-not (Test-Path (Join-Path $SPTPath 'BepInEx\core\BepInEx.dll'))) {
     throw "SPTPath '$SPTPath' is not an SPT install root: no BepInEx\core\BepInEx.dll."
@@ -42,20 +52,24 @@ if (-not (Test-Path (Join-Path $SPTPath 'BepInEx\core\BepInEx.dll'))) {
 # logged version is not the one on the zip.
 $csprojVersion = ([xml](Get-Content $project)).Project.PropertyGroup.Version | Where-Object { $_ }
 $sourceVersion = (Select-String -Path $source -Pattern 'PluginVersion\s*=\s*"([^"]+)"').Matches[0].Groups[1].Value
-if ($csprojVersion -ne $sourceVersion) {
-    throw "Version mismatch: csproj says '$csprojVersion', ThatsMinePlugin.PluginVersion says '$sourceVersion'."
+$fikaVersion = ([xml](Get-Content $fikaProject)).Project.PropertyGroup.Version | Where-Object { $_ }
+if ($csprojVersion -ne $sourceVersion -or $fikaVersion -ne $sourceVersion) {
+    throw "Version mismatch: ThatsMine.csproj '$csprojVersion', ThatsMine.Fika.csproj '$fikaVersion', ThatsMinePlugin.PluginVersion '$sourceVersion'."
 }
 $version = $csprojVersion
 Write-Host "Version $version" -ForegroundColor Cyan
 
 # ---- build -----------------------------------------------------------------------
-dotnet build $project -c Release "-p:SPTPath=$SPTPath" --nologo
+# Building the Fika project builds ThatsMine too, through its project reference.
+dotnet build $fikaProject -c Release "-p:SPTPath=$SPTPath" "-p:FikaCorePath=$FikaCorePath" --nologo
 if ($LASTEXITCODE -ne 0) { throw 'Build failed.' }
 $built = Join-Path $root 'src\ThatsMine\bin\Release\ThatsMine.dll'
+$builtFika = Join-Path $root 'src\ThatsMine.Fika\bin\Release\ThatsMine.Fika.dll'
 
 # ---- zip -------------------------------------------------------------------------
 $entries = [ordered]@{
-    'BepInEx/plugins/ThatsMine.dll' = $built
+    'BepInEx/plugins/ThatsMine.dll'      = $built
+    'BepInEx/plugins/ThatsMine.Fika.dll' = $builtFika
 }
 
 $dist = Join-Path $root 'dist'
@@ -91,5 +105,6 @@ $names | ForEach-Object { Write-Host "  $_" }
 if ($Install) {
     $dest = Join-Path $SPTPath 'BepInEx\plugins'
     Copy-Item $built $dest -Force
+    Copy-Item $builtFika $dest -Force
     Write-Host "Installed to $dest" -ForegroundColor Green
 }

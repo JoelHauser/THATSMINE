@@ -11,7 +11,8 @@ namespace ThatsMine
     ///
     /// Protection starts when the loot screen for the body opens and ends when it closes, and
     /// covers only that one body. See <see cref="BodyProtection"/> for the rule and
-    /// <see cref="Patches"/> for where it is enforced.
+    /// <see cref="Patches"/> for where it is enforced. In a Fika raid, ThatsMine.Fika carries
+    /// each player's open body to the host, which runs the bots.
     /// </summary>
     [BepInPlugin(PluginGuid, PluginName, PluginVersion)]
     public class ThatsMinePlugin : BaseUnityPlugin
@@ -20,7 +21,7 @@ namespace ThatsMine
         public const string PluginName = "THATSMINE";
 
         /// <summary>Must match the csproj's Version. Two places, and they have to agree.</summary>
-        public const string PluginVersion = "0.1.0";
+        public const string PluginVersion = "0.2.0";
 
         internal static ManualLogSource Log;
 

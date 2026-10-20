@@ -19,6 +19,7 @@ namespace ThatsMine
     ///    game's inventory operations. Refusing there makes the AI's move fail the normal way,
     ///    with an error it already handles. It is checked when the move is attempted, so a bot
     ///    that was already walking to or kneeling at the body when you opened it is stopped too.
+    ///    The co-op "own kills only" rule refuses this player's own moves at the same place.
     /// 3. <see cref="BotDeadBodyWork.UpdateWorks"/> is paused for a vanilla bot whose body is the
     ///    protected one. Without this it would step through its whole loot list with every move
     ///    refused, then give up on the body for good. Paused, it waits beside the body and carries
@@ -28,6 +29,13 @@ namespace ThatsMine
     {
         public static void Apply(Harmony harmony)
         {
+            FieldInfo lastAggressor = AccessTools.Field(typeof(Player), "LastAggressor");
+            if (lastAggressor == null || lastAggressor.FieldType != typeof(IPlayer))
+            {
+                throw new MissingFieldException("Player.LastAggressor was not found in this client.");
+            }
+            BodyProtection.LastAggressorRef = AccessTools.FieldRefAccess<Player, IPlayer>(lastAggressor);
+
             harmony.Patch(
                 Require(AccessTools.DeclaredMethod(typeof(EftGamePlayerOwner), nameof(EftGamePlayerOwner.ShowInventoryScreenLoot),
                     new[] { typeof(CompoundItem), typeof(Action), typeof(bool) })),
@@ -66,15 +74,22 @@ namespace ThatsMine
 
         private static void CanModifyItemPostfix(Item item, ItemController controller, ref bool __result, ref Error error)
         {
-            if (!__result || !BodyProtection.Active)
+            if (!__result)
             {
                 return;
             }
 
-            if (BodyProtection.ShouldBlock(item, controller))
+            if (BodyProtection.Active && BodyProtection.ShouldBlock(item, controller))
             {
                 __result = false;
                 error = new BodyInUseError(item);
+                return;
+            }
+
+            if (BodyProtection.OwnKillsOnly && BodyProtection.LockedForMe(item, controller, out string killerName))
+            {
+                __result = false;
+                error = new NotYourKillError(killerName);
             }
         }
 
@@ -97,6 +112,27 @@ namespace ThatsMine
         public override string ToString()
         {
             return "(BodyInUseError) The player is looting this body: " + _item;
+        }
+    }
+
+    /// <summary>Why this player's own move off another player's kill was refused (co-op rule).</summary>
+    internal sealed class NotYourKillError : InventoryError
+    {
+        private readonly string _killerName;
+
+        public NotYourKillError(string killerName)
+        {
+            _killerName = killerName;
+        }
+
+        public override string ToString()
+        {
+            return "(NotYourKillError) Only " + _killerName + " can loot this body while they are in the raid.";
+        }
+
+        public override string GetLocalizedDescription()
+        {
+            return "Not your kill. Only " + _killerName + " can loot this body.";
         }
     }
 }

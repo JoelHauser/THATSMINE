@@ -1,0 +1,77 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!-- netstandard2.1 because Fika.Core is: a net472 compile cannot reference it (CS1705). -->
+    <TargetFramework>netstandard2.1</TargetFramework>
+    <RootNamespace>ThatsMine.Fika</RootNamespace>
+    <AssemblyName>ThatsMine.Fika</AssemblyName>
+    <LangVersion>latest</LangVersion>
+    <Nullable>disable</Nullable>
+
+    <!-- Must match ThatsMinePlugin.PluginVersion: the two DLLs ship and update together. -->
+    <Version>0.2.0</Version>
+
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+
+    <SPTPath Condition="'$(SPTPath)' == ''">H:\SPT4.1.X</SPTPath>
+    <GameManaged>$(SPTPath)\EscapeFromTarkov_Data\Managed</GameManaged>
+    <BepInExCore>$(SPTPath)\BepInEx\core</BepInExCore>
+    <PluginDeployDir>$(SPTPath)\BepInEx\plugins</PluginDeployDir>
+
+    <!-- Where a Fika install keeps it. Override with -p:FikaCorePath=... to build without Fika installed. -->
+    <FikaCorePath Condition="'$(FikaCorePath)' == ''">$(SPTPath)\BepInEx\plugins\Fika\Fika.Core.dll</FikaCorePath>
+  </PropertyGroup>
+
+  <Target Name="ValidateFikaCore" BeforeTargets="BeforeBuild">
+    <Error Condition="!Exists('$(FikaCorePath)')"
+           Text="Fika.Core.dll not found at '$(FikaCorePath)'. Install Fika, or pass -p:FikaCorePath=&lt;path to Fika.Core.dll&gt; from a Fika release zip." />
+  </Target>
+
+  <ItemGroup>
+    <!-- ThatsMine is net472; the game loads both, so skip the SDK's framework-compatibility check. -->
+    <ProjectReference Include="..\ThatsMine\ThatsMine.csproj">
+      <Private>false</Private>
+      <SetTargetFramework>TargetFramework=net472</SetTargetFramework>
+      <SkipGetTargetFrameworkProperties>true</SkipGetTargetFrameworkProperties>
+    </ProjectReference>
+  </ItemGroup>
+
+  <ItemGroup>
+    <Reference Include="Fika.Core">
+      <HintPath>$(FikaCorePath)</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="BepInEx">
+      <HintPath>$(BepInExCore)\BepInEx.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Assembly-CSharp">
+      <HintPath>$(GameManaged)\Assembly-CSharp.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Comfort">
+      <HintPath>$(GameManaged)\Comfort.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="Sirenix.Serialization">
+      <HintPath>$(GameManaged)\Sirenix.Serialization.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine">
+      <HintPath>$(GameManaged)\UnityEngine.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+    <Reference Include="UnityEngine.CoreModule">
+      <HintPath>$(GameManaged)\UnityEngine.CoreModule.dll</HintPath>
+      <Private>false</Private>
+    </Reference>
+  </ItemGroup>
+
+  <!-- Opt-in: dotnet build -c Release -p:DeployToSPT=true -->
+  <Target Name="DeployToSPT" AfterTargets="Build" Condition="'$(DeployToSPT)' == 'true'">
+    <Copy SourceFiles="$(TargetPath)" DestinationFolder="$(PluginDeployDir)" />
+    <Message Importance="high" Text="Deployed $(TargetFileName) to $(PluginDeployDir)" />
+  </Target>
+
+</Project>
