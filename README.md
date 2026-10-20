@@ -1,8 +1,8 @@
 # THATSMINE
 
-Client plugin for SPT 4.1.x. While you have a body's loot screen open, AI can't take anything off
-that body: not its weapons, armor, rig, backpack, or anything inside them. Close the screen and AI
-can loot the body again.
+Client plugin for SPT 4.1.x, made for solo play. While you have a body's loot screen open, AI can't
+take anything off that body: not its weapons, armor, rig, backpack, or anything inside them. Close
+the screen and AI can loot the body again.
 
 - Protects only the body whose loot screen you have open. Other bodies and other AI behaviour are
   unchanged.
@@ -12,10 +12,19 @@ can loot the body again.
 
 Works with vanilla bot looting and with ORBIT's looting. SAIN doesn't loot bodies itself.
 
-## Fika
+## Install
 
-Works in Fika co-op: every player's open body is protected from the bots, whether that player is
-the host or not. Other players can still loot it.
+Unzip `THATSMINE-<version>.zip` into your SPT folder. That puts `ThatsMine.dll` in
+`BepInEx/plugins`. That is everything you need for solo play; Fika is not required.
+
+## Playing with Fika (optional)
+
+Only if you play Fika co-op: also unzip `THATSMINE-Fika-<version>.zip`, which adds
+`ThatsMine.Fika.dll`. Don't install it without Fika: it needs Fika to load, and without it SPT
+reports a plugin that failed to load.
+
+With the add-on, every player's open body is protected from the bots, whether that player is the
+host or not. Other players can still loot it.
 
 ### Own kills only (host's choice)
 
@@ -31,23 +40,19 @@ stay locked until the raid ends.
 
 ### Requirements
 
-**Everyone in the raid needs THATSMINE, the host most of all.** If a player who has it opens a body
-in a raid whose host doesn't, the host's game drops that moment's network updates. If you run a
-Fika server, add `com.mybutthasarash.thatsmine` and `com.mybutthasarash.thatsmine.fika` to Fika's
-required mods so nobody can join without them. With a headless host, install it on the headless
+**Everyone in the raid needs both zips, the host most of all.** If a player who has them opens a
+body in a raid whose host doesn't, the host's game drops that moment's network updates. If you run
+a Fika server, add `com.mybutthasarash.thatsmine` and `com.mybutthasarash.thatsmine.fika` to Fika's
+required mods so nobody can join without them. With a headless host, install them on the headless
 client too.
-
-## Install
-
-Unzip into your SPT folder. That puts `ThatsMine.dll` and `ThatsMine.Fika.dll` in
-`BepInEx/plugins`. Without Fika, BepInEx skips `ThatsMine.Fika.dll` and logs that it is missing
-Fika; that is expected.
 
 ## Build
 
 ```powershell
-scripts\pack.ps1 -SPTPath H:\SPT4.1.X -FikaCorePath <Fika.Core.dll>            # build + zip into dist\
-scripts\pack.ps1 -SPTPath H:\SPT4.1.X -FikaCorePath <Fika.Core.dll> -Install   # also copy into the install
+scripts\pack.ps1 -SPTPath H:\SPT4.1.X                                          # solo zip into dist\
+scripts\pack.ps1 -SPTPath H:\SPT4.1.X -FikaCorePath <Fika.Core.dll>            # solo zip + Fika add-on zip
+scripts\pack.ps1 -SPTPath H:\SPT4.1.X -FikaCorePath <Fika.Core.dll> -Install   # also install
 ```
 
-`-FikaCorePath` can be left out when Fika is installed in that SPT folder.
+`-FikaCorePath` can be left out when Fika is installed in that SPT folder. `-Install` only installs
+the Fika add-on into an SPT folder that has Fika.
