@@ -2,6 +2,7 @@ using System;
 using System.Reflection;
 using Diz.LanguageExtensions;
 using EFT;
+using EFT.Interactive;
 using EFT.InventoryLogic;
 using HarmonyLib;
 
@@ -49,6 +50,11 @@ namespace ThatsMine
             harmony.Patch(
                 Require(AccessTools.DeclaredMethod(typeof(BotDeadBodyWork), nameof(BotDeadBodyWork.UpdateWorks), Type.EmptyTypes)),
                 prefix: new HarmonyMethod(typeof(Patches), nameof(UpdateWorksPrefix)));
+
+            // Diagnostics: every item leaving a corpse passes here, whoever moved it.
+            harmony.Patch(
+                Require(AccessTools.DeclaredMethod(typeof(Corpse), nameof(Corpse.RemoveLootItem), new[] { typeof(RemoveItemEventArgs) })),
+                postfix: new HarmonyMethod(typeof(Patches), nameof(CorpseRemoveLootItemPostfix)));
         }
 
         private static MethodInfo Require(MethodInfo method)
@@ -90,6 +96,18 @@ namespace ThatsMine
             {
                 __result = false;
                 error = new NotYourKillError(killerName);
+            }
+        }
+
+        private static void CorpseRemoveLootItemPostfix(Corpse __instance, RemoveItemEventArgs args)
+        {
+            try
+            {
+                BodyProtection.OnCorpseItemRemoved(__instance.Item, args);
+            }
+            catch (Exception e)
+            {
+                ThatsMinePlugin.Log.LogError("Could not check an item leaving a body: " + e);
             }
         }
 

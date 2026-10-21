@@ -21,7 +21,7 @@
 
 .PARAMETER Install
     Also copy ThatsMine.dll into the install's BepInEx\plugins, plus the Fika add-on only if that
-    install has Fika.
+    install has Fika. Never deletes anything from the install.
 
 .EXAMPLE
     scripts\pack.ps1 -SPTPath H:\SPT4.1.X
@@ -118,8 +118,8 @@ else {
 }
 
 # ---- install ---------------------------------------------------------------------
-# The Fika add-on goes in only when that install has Fika; otherwise a stale copy is removed,
-# since it would only fail to load.
+# The Fika add-on goes in only when that install has Fika. A stale copy in an install without
+# Fika is reported, never deleted: nothing in an SPT install is removed by this script.
 if ($Install) {
     $dest = Join-Path $SPTPath 'BepInEx\plugins'
     Copy-Item $built $dest -Force
@@ -133,7 +133,6 @@ if ($Install) {
         }
     }
     elseif (Test-Path $installedFika) {
-        Remove-Item $installedFika -Force
-        Write-Host "Fika is not installed: removed ThatsMine.Fika.dll" -ForegroundColor Yellow
+        Write-Host "Fika is not installed but $installedFika is there; it will fail to load. Remove it yourself if you want." -ForegroundColor Yellow
     }
 }

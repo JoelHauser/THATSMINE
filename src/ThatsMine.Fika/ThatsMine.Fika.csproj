@@ -9,7 +9,7 @@
     <Nullable>disable</Nullable>
 
     <!-- Must match ThatsMinePlugin.PluginVersion: the two DLLs ship and update together. -->
-    <Version>0.2.0</Version>
+    <Version>0.2.1</Version>
 
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
     <TreatWarningsAsErrors>true</TreatWarningsAsErrors>

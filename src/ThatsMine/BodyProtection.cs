@@ -70,6 +70,14 @@ namespace ThatsMine
         /// <summary>Items already logged as blocked, so a retry loop logs once per session.</summary>
         private static readonly HashSet<Item> LoggedBlocks = new HashSet<Item>();
 
+        /// <summary>
+        /// The gate's last decision for each item on a protected body, so that an item which still
+        /// leaves the body can be explained. Cleared with the local session.
+        /// </summary>
+        private static readonly Dictionary<Item, string> GateDecisions = new Dictionary<Item, string>();
+
+        private const string LooterDecision = "allowed: the looter's own move";
+
         internal static bool Active => (_local != null && EnforceLocally) || Remotes.Count > 0;
 
         /// <summary>
@@ -119,6 +127,7 @@ namespace ThatsMine
 
             int session = ++_session;
             _local = new Session(equipment, Describe(dead), looter, world, null);
+            _local.Snapshot = new HashSet<Item>(equipment.GetAllItems());
             ThatsMinePlugin.Log.LogInfo("Protecting " + _local.Name + " from AI looting while you loot it.");
             LocalOpened?.Invoke(dead, looter);
 
@@ -177,8 +186,14 @@ namespace ThatsMine
 
             Item root = item.GetRootItem();
             Session session = Find(root);
-            if (session == null || controller == session.LooterController)
+            if (session == null)
             {
+                return false;
+            }
+
+            if (controller == session.LooterController)
+            {
+                GateDecisions[item] = LooterDecision;
                 return false;
             }
 
@@ -186,9 +201,13 @@ namespace ThatsMine
             Player actor = session.World.GetEverExistedPlayerByID(controller.ID);
             if (actor == null || !actor.IsAI)
             {
+                GateDecisions[item] = actor == null
+                    ? "allowed: no player has controller id " + controller.ID + " (" + controller.GetType().Name + ")"
+                    : "allowed: " + Describe(actor) + " is not AI";
                 return false;
             }
 
+            GateDecisions[item] = "refused " + Describe(actor);
             if (LoggedBlocks.Add(item))
             {
                 ThatsMinePlugin.Debug("Blocked " + Describe(actor) + " from taking "
@@ -242,6 +261,83 @@ namespace ThatsMine
 
             killerName = killer.Profile?.Nickname ?? "another player";
             return true;
+        }
+
+        /// <summary>
+        /// Diagnostics: called for every item that leaves a corpse. If the corpse is protected and
+        /// the item did not go by the looter's own hand, the protection failed, so this says how:
+        /// what the gate last decided for that item, or that it was never asked.
+        /// </summary>
+        internal static void OnCorpseItemRemoved(Item corpseRoot, RemoveItemEventArgs args)
+        {
+            if (args == null || args.Status != CommandStatus.Succeed || !Active)
+            {
+                return;
+            }
+
+            Session session = Find(corpseRoot);
+            if (session == null)
+            {
+                return;
+            }
+
+            if (!GateDecisions.TryGetValue(args.Item, out string decision))
+            {
+                decision = "the gate was never asked about it";
+            }
+            if (decision == LooterDecision)
+            {
+                return;
+            }
+
+            ThatsMinePlugin.Log.LogWarning(args.Item.LocalizedName() + " left " + session.Name
+                                           + " while it was protected. Event owner: " + args.OwnerId
+                                           + ". Gate: " + decision + ".");
+        }
+
+        /// <summary>
+        /// Diagnostics that do not depend on any event: every item that was on the body when
+        /// protection started, is gone now, and did not end up in the looter's own gear, was taken
+        /// by someone else. Names whose gear it is in now.
+        /// </summary>
+        private static void ReportMissingItems(Session session)
+        {
+            if (session.Snapshot == null)
+            {
+                return;
+            }
+
+            foreach (Item item in session.Snapshot)
+            {
+                Item root = item.GetRootItem();
+                if (root == session.Body || root == session.Looter.Equipment)
+                {
+                    continue;
+                }
+
+                // A container the looter took carries its contents with it; only report the
+                // item whose own parent left, not everything inside it.
+                Item parentRoot = item.Parent?.Container?.ParentItem;
+                if (parentRoot != null && parentRoot != session.Body && session.Snapshot.Contains(parentRoot)
+                    && parentRoot.GetRootItem() == root)
+                {
+                    continue;
+                }
+
+                if (!GateDecisions.TryGetValue(item, out string decision))
+                {
+                    decision = "the gate was never asked about it";
+                }
+                else if (decision == LooterDecision)
+                {
+                    continue; // the looter moved it, e.g. dropped it on the ground
+                }
+
+                Player holder = FindOwner(session.World, root as InventoryEquipment);
+                string where = holder != null ? Describe(holder) + (holder.IsAI ? " (AI)" : "") : "somewhere else (" + root + ")";
+                ThatsMinePlugin.Log.LogWarning(item.LocalizedName() + " was taken off " + session.Name
+                                               + " while protected and is now in " + where + ". Gate: " + decision + ".");
+            }
         }
 
         /// <summary>True if <paramref name="deadPlayer"/>'s body is a protected one.</summary>
@@ -306,9 +402,11 @@ namespace ThatsMine
                 return;
             }
 
+            ReportMissingItems(_local);
             ThatsMinePlugin.Log.LogInfo("Stopped protecting " + _local.Name + ".");
             _local = null;
             LoggedBlocks.Clear();
+            GateDecisions.Clear();
             LocalClosed?.Invoke();
         }
 
@@ -334,6 +432,11 @@ namespace ThatsMine
         /// </summary>
         private static Player FindOwner(GameWorld world, InventoryEquipment equipment)
         {
+            if (world == null || equipment == null)
+            {
+                return null;
+            }
+
             foreach (Player player in world.AllPlayersEverExisted)
             {
                 if (player != null && player.Equipment == equipment)
@@ -357,6 +460,9 @@ namespace ThatsMine
             internal readonly ItemController LooterController;
             internal readonly GameWorld World;
             private readonly Func<bool> _connected;
+
+            /// <summary>Diagnostics, local session only: every item on the body when it opened.</summary>
+            internal HashSet<Item> Snapshot;
 
             internal Session(InventoryEquipment body, string name, Player looter, GameWorld world, Func<bool> connected)
             {
